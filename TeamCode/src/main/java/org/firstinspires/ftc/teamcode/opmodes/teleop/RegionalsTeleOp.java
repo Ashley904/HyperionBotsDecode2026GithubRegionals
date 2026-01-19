@@ -1,10 +1,13 @@
 package org.firstinspires.ftc.teamcode.opmodes.teleop;
 
+import com.arcrobotics.ftclib.gamepad.ButtonReader;
+import com.arcrobotics.ftclib.gamepad.GamepadEx;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.IMU;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -31,10 +34,27 @@ public class RegionalsTeleOp extends OpMode {
 
 
 
-    private double currentHeading=0.0, targetHeading=0.0, previousHeadingError=0.0;
+    private double currentHeading=0.0, targetHeading=0.0, previousHeadingError=0.0, headingLockTarget=0.0;
     private double currentXPosition=0.0, currentYPosition=0.0, distanceToGoal=0.0, angleToGoal=0.0;
     private static final List<CalibrationPoints> calibrationPoints = new ArrayList<>();
     public static double dynamicTargetFlyWheelVelocity=0.0, dynamicPitcherServoPosition=0.0;
+
+
+
+
+
+    boolean lockHeading=false;
+    boolean autoAimEnabled=false;
+
+
+
+
+
+    ButtonReader driveModeToggleButton;
+    ButtonReader allianceSelectionToggleButton;
+    ButtonReader resetHeadingToggleButton;
+    ButtonReader autoAimToggleButton;
+    ButtonReader iterateStartingPositionsToggleButton;
 
 
 
@@ -77,6 +97,17 @@ public class RegionalsTeleOp extends OpMode {
 
 
 
+        Constants.GamePadControls.gamepad1EX = new GamepadEx(gamepad1);
+        Constants.GamePadControls.gamepad2EX = new GamepadEx(gamepad2);
+
+        driveModeToggleButton = new ButtonReader(Constants.GamePadControls.gamepad1EX, Constants.GamePadControls.driveModeToggleMapping);
+        allianceSelectionToggleButton = new ButtonReader(Constants.GamePadControls.gamepad1EX, Constants.GamePadControls.allianceSelectionToggleMapping);
+        resetHeadingToggleButton = new ButtonReader(Constants.GamePadControls.gamepad1EX, Constants.GamePadControls.resetHeadingToggleMapping);
+        autoAimToggleButton = new ButtonReader(Constants.GamePadControls.gamepad1EX, Constants.GamePadControls.autoAimToggleMapping);
+        iterateStartingPositionsToggleButton = new ButtonReader(Constants.GamePadControls.gamepad1EX, Constants.GamePadControls.iterateStartingPositionsToggleMapping);
+
+
+
         initializeCalibrationPoints();
     }
 
@@ -86,6 +117,32 @@ public class RegionalsTeleOp extends OpMode {
 
     @Override
     public void init_loop(){
+        driveModeToggleButton.readValue(); // Drive Mode Selection
+        if(driveModeToggleButton.wasJustPressed()){
+            Constants.RobotConstants.selectedDriveMode = (Constants.RobotConstants.selectedDriveMode == Constants.RobotConstants.DriveMode.RobotCentric ?
+                    Constants.RobotConstants.DriveMode.FieldCentric : Constants.RobotConstants.DriveMode.RobotCentric);
+
+            RumbleGamePad(150, gamepad1);
+        }
+
+        allianceSelectionToggleButton.readValue(); // Alliance Selection
+        if(allianceSelectionToggleButton.wasJustPressed()){
+            Constants.RobotConstants.selectedAlliance = (Constants.RobotConstants.selectedAlliance == Constants.RobotConstants.Alliance.BlueAlliance ?
+                    Constants.RobotConstants.Alliance.RedAlliance : Constants.RobotConstants.Alliance.BlueAlliance);
+
+            RumbleGamePad(150, gamepad1);
+        }
+
+        iterateStartingPositionsToggleButton.readValue();
+        if(iterateStartingPositionsToggleButton.wasJustPressed()) {
+            Constants.FieldConstants.StartingPosition[] positions = Constants.FieldConstants.StartingPosition.values();
+            int currentIndex = java.util.Arrays.asList(positions).indexOf(Constants.FieldConstants.selectedStartingPosition);
+            int nextIndex = (currentIndex + 1) % positions.length; // wraps around to 0
+            Constants.FieldConstants.selectedStartingPosition = positions[nextIndex];
+            RumbleGamePad(150, gamepad1);
+        }
+
+
         telemetry.addData("Alliance: ", Constants.RobotConstants.selectedAlliance);
         telemetry.addData("Selected Start Position: ", Constants.FieldConstants.selectedStartingPosition);
         telemetry.update();
@@ -103,8 +160,25 @@ public class RegionalsTeleOp extends OpMode {
         OdometryTracking();
         CalculateShooterParameters();
         BackgroundOperations();
+        GamePadControlsManager();
 
         telemetry.update();
+    }
+
+
+
+
+
+    private void GamePadControlsManager(){
+        resetHeadingToggleButton.readValue(); //Reset heading
+        if(resetHeadingToggleButton.wasJustPressed()){
+            imu.resetYaw();
+            RumbleGamePad(100, gamepad1);
+        }
+
+        autoAimToggleButton.readValue(); //Auto Aiming
+        if(autoAimToggleButton.wasJustPressed() && !autoAimEnabled) autoAimEnabled = true;
+        else if(autoAimToggleButton.wasJustPressed() && autoAimEnabled) autoAimEnabled = false;
     }
 
 
@@ -120,7 +194,12 @@ public class RegionalsTeleOp extends OpMode {
 
 
     private void RobotDrive(){
-        targetHeading = Math.toRadians(angleToGoal);
+        if(Math.abs(gamepad1.right_stick_x) > 0.01) {
+            headingLockTarget = currentHeading;
+            lockHeading = false;
+        } else lockHeading = true;
+
+        targetHeading = (autoAimEnabled ? Math.toRadians(angleToGoal) : headingLockTarget);
         double headingCorrection = PIDController();
 
         double adjustedDrivingSpeed = Constants.RobotConstants.driveCubicTerm * Math.pow(gamepad1.right_trigger, 3) + Constants.RobotConstants.driveLinearTerm * gamepad1.right_trigger;
@@ -134,6 +213,8 @@ public class RegionalsTeleOp extends OpMode {
         double headingOffset = Constants.RobotConstants.selectedAlliance == Constants.RobotConstants.Alliance.RedAlliance ? Math.toRadians(-90) : Math.toRadians(90);
         double rotatedX = x * Math.cos(-currentHeading+headingOffset) - y * Math.sin(-currentHeading+headingOffset);
         double rotatedY = x * Math.sin(-currentHeading+headingOffset) + y * Math.cos(-currentHeading+headingOffset);
+
+        if(lockHeading) rx = headingCorrection;
 
         double frontLeftMotorPower = (Constants.RobotConstants.selectedDriveMode == Constants.RobotConstants.DriveMode.RobotCentric ?
                 (y + x + rx) : (rotatedY + rotatedX + rx));
@@ -287,8 +368,20 @@ public class RegionalsTeleOp extends OpMode {
         telemetry.addData("Current Heading: ", Math.toDegrees(currentHeading));
         telemetry.addData("X Position: ", currentXPosition);
         telemetry.addData("Y Position: ", currentYPosition);
-        telemetry.addData("Distance to goal: ", distanceToGoal);
-        telemetry.addData("Angle to goal: ", angleToGoal);
+        telemetry.addData("Distance To Goal: ", distanceToGoal);
+        telemetry.addData("Angle To Goal: ", angleToGoal);
+        telemetry.addData("Auto Aim Status: ", autoAimEnabled);
+    }
+
+
+
+
+
+    private void RumbleGamePad(int duration, Gamepad chosenGamePad){
+        Gamepad.RumbleEffect rumbleEffect = new Gamepad.RumbleEffect.Builder()
+                .addStep(1.0, 1.0, duration)
+                .build();
+        chosenGamePad.runRumbleEffect(rumbleEffect);
     }
 
 

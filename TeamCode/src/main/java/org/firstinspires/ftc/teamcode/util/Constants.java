@@ -1,6 +1,8 @@
 package org.firstinspires.ftc.teamcode.util;
 
 import com.acmerobotics.dashboard.config.Config;
+import com.arcrobotics.ftclib.gamepad.GamepadEx;
+import com.arcrobotics.ftclib.gamepad.GamepadKeys;
 
 @Config
 public class Constants {
@@ -18,17 +20,17 @@ public class Constants {
 
 
 
-        public static String frontLeftMotorName = "front_left_motor";
-        public static String backLeftMotorName = "back_left_motor";
-        public static String frontRightMotorName = "front_right_motor";
-        public static String backRightMotorName = "back_right_motor";
+        public static String frontLeftMotorName = "FL";
+        public static String backLeftMotorName = "BL";
+        public static String frontRightMotorName = "FR";
+        public static String backRightMotorName = "BR";
 
-        public static boolean frontLeftMotorInverted = true;
-        public static boolean backLeftMotorInverted = true;
-        public static boolean frontRightMotorInverted = false;
-        public static boolean backRightMotorInverted = false;
+        public static boolean frontLeftMotorInverted = false;
+        public static boolean backLeftMotorInverted = false;
+        public static boolean frontRightMotorInverted = true;
+        public static boolean backRightMotorInverted = true;
 
-        public static boolean floatModeEnabled = false;
+        public static boolean floatModeEnabled = true;
 
         public static double minimumDriveSpeed=0.315;
         public static double driveCubicTerm=0.5, driveLinearTerm=0.4;
@@ -40,10 +42,27 @@ public class Constants {
         public static String imuName = "imu";
         public static String pinpointDriverName = "pinpoint";
 
-        public static double xPodOffset=0.0, yPodOffset=0.0;
+        public static double xPodOffset=12.0, yPodOffset=-19.0;
 
         public static boolean xPodInverted = false;
-        public static boolean yPodInverted = false;
+        public static boolean yPodInverted = true;
+    }
+
+
+
+
+
+    @Config
+    public static class GamePadControls{
+        public static GamepadEx gamepad1EX;
+        public static GamepadEx gamepad2EX;
+
+
+        public static GamepadKeys.Button driveModeToggleMapping = GamepadKeys.Button.DPAD_UP;
+        public static GamepadKeys.Button allianceSelectionToggleMapping = GamepadKeys.Button.DPAD_LEFT;
+        public static GamepadKeys.Button resetHeadingToggleMapping = GamepadKeys.Button.START;
+        public static GamepadKeys.Button autoAimToggleMapping = GamepadKeys.Button.RIGHT_BUMPER;
+        public static GamepadKeys.Button iterateStartingPositionsToggleMapping = GamepadKeys.Button.LEFT_BUMPER;
     }
 
 
@@ -75,6 +94,6 @@ public class Constants {
                 this.headingDeg = headingDeg;
             }
         }
-        public static StartingPosition selectedStartingPosition = StartingPosition.blueAllianceCloseZoneStartPosition;
+        public static StartingPosition selectedStartingPosition = StartingPosition.blueAllianceFarZoneStartPosition;
     }
 }
